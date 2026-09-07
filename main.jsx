@@ -8,6 +8,59 @@ const isFolder = (value) => {
     return typeof value === 'object' && value !== null;
 };
 
+const HF_BUCKET_BASE = 'https://huggingface.co/buckets/Zigref/Zigref/resolve/database';
+
+function parseRepoPath(pathname) {
+    const parts = pathname
+        .split('/')
+        .filter(Boolean)
+        .map((p) => {
+            try {
+                return decodeURIComponent(p);
+            } catch {
+                return p;
+            }
+        });
+    if (parts.length !== 3) return null;
+    const [provider, owner, repo] = parts;
+    if (provider !== 'gh' && provider !== 'cb') return null;
+    if (!owner || !repo) return null;
+    return { provider, owner, repo };
+}
+
+async function decodeBrBuffer(buf) {
+    try {
+        const ds = new DecompressionStream('br');
+        const stream = new Blob([buf]).stream().pipeThrough(ds);
+        const text = await new Response(stream).text();
+        if (text && text.length > 0) return text;
+    } catch (_) {
+        // Native brotli DecompressionStream not supported (e.g. Chrome), fall through to wasm.
+    }
+    const mod = await import('brotli-wasm');
+    const brotli = await mod.default;
+    const out = brotli.decompress(new Uint8Array(buf));
+    return new TextDecoder().decode(out);
+}
+
+async function fetchDocsBr(provider, owner, repo) {
+    const url = `${HF_BUCKET_BASE}/${provider}/${owner}/${repo}.br`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Docs not found for ${provider}/${owner}/${repo} (${res.status})`);
+    const buf = await res.arrayBuffer();
+    const sizeKiB = (buf.byteLength / 1024).toFixed(2);
+    let text;
+    try {
+        text = await decodeBrBuffer(buf);
+    } catch (_) {
+        // Backend writes plain JSON with a .br extension when docs exceed the limit.
+        text = new TextDecoder().decode(buf);
+    }
+    const data = JSON.parse(text);
+    if (data.error) throw new Error(data.error);
+    return { data, sizeKiB };
+}
+
 function RenderComponent({ component, prefix }) {
     const full_name = prefix ? `${prefix}::${component.name}` : component.name;
     const component_id = full_name.replace(/::/g, '--');
@@ -260,6 +313,9 @@ function App() {
     const [size_in_byte, set_size_in_byte] = useState(null);
     const [active_view, set_active_view] = useState('files');
     const [currentPath, setCurrentPath] = useState(window.location.pathname);
+    const [is_loading, set_is_loading] = useState(false);
+    const [fetch_error, set_fetch_error] = useState(null);
+    const [repo_info, set_repo_info] = useState(null);
 
     useEffect(() => {
         const handleLocationChange = () => {
@@ -294,19 +350,40 @@ function App() {
     }, []);
     useEffect(() => {
         if (is_home_page) return;
-        fetch('/template.json.br')
-            .then((r) => {
-                const size_byte = Number(r.headers.get('Content-Length'));
-                const size_in_kib = size_byte / 1024;
-                set_size_in_byte(size_in_kib.toFixed(2));
-                return r.json();
-            })
-            .then((data) => {
+        const parsed = parseRepoPath(currentPath);
+        if (!parsed) {
+            set_fetch_error(`Invalid docs path "${currentPath}". Expected /gh/{owner}/{repo} or /cb/{owner}/{repo}.`);
+            setTree(undefined);
+            setDataEntries(undefined);
+            set_repo_info(null);
+            return;
+        }
+        let cancelled = false;
+        set_is_loading(true);
+        set_fetch_error(null);
+        setTree(undefined);
+        setDataEntries(undefined);
+        setSelectedIndex(null);
+        set_repo_info(parsed);
+        fetchDocsBr(parsed.provider, parsed.owner, parsed.repo)
+            .then(({ data, sizeKiB }) => {
+                if (cancelled) return;
+                set_size_in_byte(sizeKiB);
                 setTree(data.metadata.project_tree);
-                setCommitHash(data.metadata.commit_hash.slice(0, 10) + '...');
+                setCommitHash((data.metadata.commit_hash || '').slice(0, 10) + '...');
                 setDataEntries(data.data);
+            })
+            .catch((e) => {
+                if (cancelled) return;
+                set_fetch_error(e.message);
+            })
+            .finally(() => {
+                if (!cancelled) set_is_loading(false);
             });
-    }, [is_home_page]);
+        return () => {
+            cancelled = true;
+        };
+    }, [currentPath, is_home_page]);
 
     if (is_home_page) {
         return (
@@ -376,7 +453,18 @@ function App() {
                     {active_view === 'files' ? (
                         <>
                             <h5 id="mention_title">File Explorer</h5>
-                            {tree ? <TreeView tree={tree} onSelect={setSelectedIndex} /> : 'Loading…'}
+                            {repo_info && (
+                                <p style={{ fontSize: 'small', opacity: 0.7 }}>
+                                    {repo_info.provider}/{repo_info.owner}/{repo_info.repo}
+                                </p>
+                            )}
+                            {fetch_error ? (
+                                <p>{fetch_error}</p>
+                            ) : tree ? (
+                                <TreeView tree={tree} onSelect={setSelectedIndex} />
+                            ) : (
+                                'Loading…'
+                            )}
                         </>
                     ) : (
                         <>
@@ -386,7 +474,11 @@ function App() {
                 </aside>
 
                 <main>
-                    {selectedIndex !== null ? (
+                    {is_loading ? (
+                        <p>Loading docs…</p>
+                    ) : fetch_error ? (
+                        <p>{fetch_error}</p>
+                    ) : selectedIndex !== null ? (
                         <>
                             <h2>
                                 Showing documentation for file:{' '}
