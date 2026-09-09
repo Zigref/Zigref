@@ -61,16 +61,54 @@ async function fetchDocsBr(provider, owner, repo) {
     return { data, sizeKiB };
 }
 
-function RenderComponent({ component, prefix }) {
+function build_source_url(provider, owner, repo, commit_hash, file_path, line_number) {
+    if (!provider || !owner || !repo || !file_path) return null;
+
+    const path_which_is_encoded = file_path
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+
+    const the_line_number_part = line_number != null ? `#L${line_number}` : '';
+
+    if (provider === 'gh') {
+        const ref = commit_hash || 'HEAD';
+        return `https://github.com/${owner}/${repo}/blob/${ref}/${path_which_is_encoded}${the_line_number_part}`;
+    }
+
+    if (provider === 'cb') {
+        if (commit_hash) {
+            return `https://codeberg.org/${owner}/${repo}/src/commit/${commit_hash}/${path_which_is_encoded}${the_line_number_part}`;
+        } else {
+            return `https://codeberg.org/${owner}/${repo}/src/branch/main/${path_which_is_encoded}${the_line_number_part}`;
+        }
+    }
+
+    return null;
+}
+
+function RenderComponent({ component, prefix, repo_info, file_path, commit_hash }) {
     const full_name = prefix ? `${prefix}::${component.name}` : component.name;
     const component_id = full_name.replace(/::/g, '--');
+    const source_url =
+        repo_info && file_path
+            ? build_source_url(
+                repo_info.provider,
+                repo_info.owner,
+                repo_info.repo,
+                commit_hash,
+                file_path,
+                component.line_number,
+            )
+            : null;
+    const source_label = repo_info?.provider === 'cb' ? 'Open file on Codeberg' : 'Open file on GitHub';
     return (
         <div className="box" id={component_id}>
             <h3>
                 <span className="component_type">{component.type}</span>{' '}
                 <span className="component_name">{full_name}</span>:
                 <span className="line_number">{component.line_number}</span>{' '}
-                <a className="link-icon" href={`#${component_id}`}>
+                <a className="link-icon" href={`#${component_id}`} title="Copy link to this item">
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="16"
@@ -86,7 +124,34 @@ function RenderComponent({ component, prefix }) {
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                     </svg>
-                </a>
+                </a>{' '}
+                {source_url && (
+                    <a
+                        className="link-icon"
+                        href={source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={source_label}
+                        aria-label={source_label}
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="lucide lucide-external-link-icon lucide-external-link"
+                        >
+                            <path d="M15 3h6v6" />
+                            <path d="M10 14 21 3" />
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        </svg>
+                    </a>
+                )}
             </h3>
             <p>{component.comment}</p>
             {component.type === 'test' ? (
@@ -102,116 +167,154 @@ function RenderComponent({ component, prefix }) {
     );
 }
 
-function RenderNamespace({ namespace, prefix }) {
+function RenderNamespace({ namespace, prefix, repo_info, file_path, commit_hash }) {
     const ns_prefix = prefix ? `${prefix}::${namespace.name}` : namespace.name;
     return (
         <details className="namespace-section">
             <summary className="namespace-header">{namespace.name}</summary>
             <div className="namespace-body">
                 {namespace.components &&
-                    namespace.components.map((c, i) => <RenderComponent key={i} component={c} prefix={ns_prefix} />)}
+                    namespace.components.map((c, i) => (
+                        <RenderComponent
+                            key={i}
+                            component={c}
+                            prefix={ns_prefix}
+                            repo_info={repo_info}
+                            file_path={file_path}
+                            commit_hash={commit_hash}
+                        />
+                    ))}
                 {namespace.namespaces &&
-                    namespace.namespaces.map((ns, i) => <RenderNamespace key={i} namespace={ns} prefix={ns_prefix} />)}
+                    namespace.namespaces.map((ns, i) => (
+                        <RenderNamespace
+                            key={i}
+                            namespace={ns}
+                            prefix={ns_prefix}
+                            repo_info={repo_info}
+                            file_path={file_path}
+                            commit_hash={commit_hash}
+                        />
+                    ))}
             </div>
         </details>
     );
 }
 
-function RenderDocumentation({ data }) {
+function RenderDocumentation({ data, repo_info, file_path, commit_hash }) {
     if (!data.components || data.components.length == 0) {
         return <>No documentation for this file!</>;
     }
     return (
         <>
             {data.components.map((c, i) => (
-                <RenderComponent key={i} component={c} prefix="" />
+                <RenderComponent
+                    key={i}
+                    component={c}
+                    prefix=""
+                    repo_info={repo_info}
+                    file_path={file_path}
+                    commit_hash={commit_hash}
+                />
             ))}
-            {data.namespaces && data.namespaces.map((ns, i) => <RenderNamespace key={i} namespace={ns} prefix="" />)}
+            {data.namespaces &&
+                data.namespaces.map((ns, i) => (
+                    <RenderNamespace
+                        key={i}
+                        namespace={ns}
+                        prefix=""
+                        repo_info={repo_info}
+                        file_path={file_path}
+                        commit_hash={commit_hash}
+                    />
+                ))}
         </>
     );
 }
 
-function TreeView({ tree, onSelect }) {
+function TreeView({ tree, onSelect, path_of_the_parent = '' }) {
     const entries = Object.entries(tree).sort(([, a], [, b]) => {
         return Number(isFolder(b)) - Number(isFolder(a));
     });
 
     return (
         <ul>
-            {entries.map(([name, value]) => (
-                <div key={name}>
-                    {isFolder(value) ? (
-                        <details open>
-                            <summary>
-                                <span style={{ display: 'flex', alignItems: 'center' }} className="file_folder_name">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="15"
-                                        height="15"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        stroke-width="2"
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        class="lucide lucide-folder-icon lucide-folder"
-                                    >
-                                        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-                                    </svg>
-                                    &nbsp;{name}&#47;
-                                </span>
-                            </summary>
-                            <TreeView tree={value} onSelect={onSelect} />
-                        </details>
-                    ) : (
-                        <span
-                            className="file_folder_name"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                            }}
-                            onClick={() => onSelect({ name, value })}
-                        >
-                            &nbsp; &nbsp;
-                            <svg xmlns="http://www.w3.org/2000/svg" width={15} height={15} viewBox="0 0 153 140">
-                                <g fill="#f7a41d">
-                                    <g>
-                                        <polygon points="46,22 28,44 19,30" />
-                                        <polygon
-                                            points="46,22 33,33 28,44 22,44 22,95 31,95 20,100 12,117 0,117 0,22"
-                                            shape-rendering="crispEdges"
-                                        />
-                                        <polygon points="31,95 12,117 4,106" />
+            {entries.map(([name, value]) => {
+                const complete_path = path_of_the_parent ? `${path_of_the_parent}/${name}` : name;
+                return (
+                    <div key={name}>
+                        {isFolder(value) ? (
+                            <details open>
+                                <summary>
+                                    <span style={{ display: 'flex', alignItems: 'center' }} className="file_folder_name">
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="15"
+                                            height="15"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                            stroke-linecap="round"
+                                            stroke-linejoin="round"
+                                            class="lucide lucide-folder-icon lucide-folder"
+                                        >
+                                            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+                                        </svg>
+                                        &nbsp;{name}&#47;
+                                    </span>
+                                </summary>
+                                <TreeView tree={value} onSelect={onSelect} path_of_the_parent={complete_path} />
+                            </details>
+                        ) : (
+                            <span
+                                className="file_folder_name"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    cursor: 'pointer',
+                                }}
+                                onClick={() => onSelect({ name: complete_path, path: complete_path, value })}
+                            >
+                                &nbsp; &nbsp;
+                                <svg xmlns="http://www.w3.org/2000/svg" width={15} height={15} viewBox="0 0 153 140">
+                                    <g fill="#f7a41d">
+                                        <g>
+                                            <polygon points="46,22 28,44 19,30" />
+                                            <polygon
+                                                points="46,22 33,33 28,44 22,44 22,95 31,95 20,100 12,117 0,117 0,22"
+                                                shape-rendering="crispEdges"
+                                            />
+                                            <polygon points="31,95 12,117 4,106" />
+                                        </g>
+                                        <g>
+                                            <polygon points="56,22 62,36 37,44" />
+                                            <polygon
+                                                points="56,22 111,22 111,44 37,44 56,32"
+                                                shape-rendering="crispEdges"
+                                            />
+                                            <polygon points="116,95 97,117 90,104" />
+                                            <polygon
+                                                points="116,95 100,104 97,117 42,117 42,95"
+                                                shape-rendering="crispEdges"
+                                            />
+                                            <polygon points="150,0 52,117 3,140 101,22" />
+                                        </g>
+                                        <g>
+                                            <polygon points="141,22 140,40 122,45" />
+                                            <polygon
+                                                points="153,22 153,117 106,117 120,105 125,95 131,95 131,45 122,45 132,36 141,22"
+                                                shape-rendering="crispEdges"
+                                            />
+                                            <polygon points="125,95 130,110 106,117" />
+                                        </g>
                                     </g>
-                                    <g>
-                                        <polygon points="56,22 62,36 37,44" />
-                                        <polygon
-                                            points="56,22 111,22 111,44 37,44 56,32"
-                                            shape-rendering="crispEdges"
-                                        />
-                                        <polygon points="116,95 97,117 90,104" />
-                                        <polygon
-                                            points="116,95 100,104 97,117 42,117 42,95"
-                                            shape-rendering="crispEdges"
-                                        />
-                                        <polygon points="150,0 52,117 3,140 101,22" />
-                                    </g>
-                                    <g>
-                                        <polygon points="141,22 140,40 122,45" />
-                                        <polygon
-                                            points="153,22 153,117 106,117 120,105 125,95 131,95 131,45 122,45 132,36 141,22"
-                                            shape-rendering="crispEdges"
-                                        />
-                                        <polygon points="125,95 130,110 106,117" />
-                                    </g>
-                                </g>
-                            </svg>
-                            &nbsp;{name}
-                        </span>
-                    )}
-                </div>
-            ))}
+                                </svg>
+                                &nbsp;{name}
+                            </span>
+                        )}
+                    </div>
+                );
+            })}
         </ul>
     );
 }
@@ -309,6 +412,7 @@ function App() {
     const [tree, setTree] = useState();
     const [dataEntries, setDataEntries] = useState();
     const [commit_hash, setCommitHash] = useState();
+    const [commit_hash_full, set_commit_hash_full] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(null);
     const [size_in_byte, set_size_in_byte] = useState(null);
     const [active_view, set_active_view] = useState('files');
@@ -370,7 +474,9 @@ function App() {
                 if (cancelled) return;
                 set_size_in_byte(sizeKiB);
                 setTree(data.metadata.project_tree);
-                setCommitHash((data.metadata.commit_hash || '').slice(0, 10) + '...');
+                const full_hash = data.metadata.commit_hash || '';
+                set_commit_hash_full(full_hash);
+                setCommitHash(full_hash ? full_hash.slice(0, 10) + '...' : '');
                 setDataEntries(data.data);
             })
             .catch((e) => {
@@ -488,6 +594,9 @@ function App() {
                                 <RenderDocumentation
                                     key={selectedIndex.value}
                                     data={dataEntries[selectedIndex.value]}
+                                    repo_info={repo_info}
+                                    file_path={selectedIndex.path || selectedIndex.name}
+                                    commit_hash={commit_hash_full}
                                 />
                             ) : (
                                 <p>Select a file</p>
