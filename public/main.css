@@ -144,6 +144,52 @@ footer {
     border-radius: 5px;
 }
 
+.home-search-block .search-results {
+    list-style: none;
+    margin: 12px 0 0 0;
+    padding: 0;
+    text-align: left;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.home-search-block .search-results li {
+    border: 1px solid #4e4e4e;
+    border-radius: 4px;
+    background-color: #212121;
+    margin-bottom: 6px;
+    padding: 8px 12px;
+    font-size: small;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.home-search-block .search-results li a {
+    color: white;
+    text-decoration: none;
+    display: block;
+}
+
+.home-search-block .search-results li:hover {
+    background-color: gold;
+    border-color: gold;
+}
+
+.home-search-block .search-results li:hover a {
+    color: #4a4a4a;
+}
+
+.home-search-block {
+    width: 440px;
+    max-width: 90vw;
+}
+
+.home-search-block .input-text {
+    width: 100%;
+    box-sizing: border-box;
+}
+
 #side-side-bar {
     width: 50px;
     height: calc(100vh - 80px);

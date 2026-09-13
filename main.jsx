@@ -9,6 +9,89 @@ const isFolder = (value) => {
 };
 
 const HF_BUCKET_BASE = 'https://huggingface.co/buckets/Zigref/Zigref/resolve/database';
+const SEARCH_API_BASE = import.meta.env?.VITE_SEARCH_API || 'http://localhost:8080';
+
+async function fetch_repo_search(q, signal) {
+    const res = await fetch(
+        `${SEARCH_API_BASE}/search?q=${encodeURIComponent(q)}`,
+        { signal }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(`search failed.`);
+    }
+
+    return data.results || [];
+}
+
+function useRepoSearch(query, delay = 250) {
+    const [results, set_results] = useState(null);
+    const [loading, set_loading] = useState(false);
+    const [error, set_error] = useState(null);
+
+    useEffect(() => {
+        const q = query?.trim();
+
+        if (!q) {
+            set_results(null);
+            set_loading(false);
+            set_error(null);
+            return;
+        }
+
+        if (q.length > 30) {
+            set_results([]);
+            set_loading(false);
+            set_error('query entered is more than 30 characters.');
+            return;
+        }
+
+        const controller = new AbortController();
+
+        set_loading(true);
+        set_error(null);
+
+        const timer = setTimeout(async () => {
+            try {
+                set_results(await fetch_repo_search(q, controller.signal));
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    set_results([]);
+                    set_error(e.message);
+                }
+            } finally {
+                set_loading(false);
+            }
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [query]);
+
+    return { results, loading, error };
+}
+
+function SearchResultList({ results, loading, error, query }) {
+    const q = query.trim();
+    if (!q) return null;
+    if (loading) return <p style={{ fontSize: 'small', opacity: 0.7 }}>Searching...</p>;
+    if (error) return <p style={{ fontSize: 'small', opacity: 0.7 }}>{error}</p>;
+    if (!results) return <></>;
+    if (results.length === 0) return <p style={{ fontSize: 'small', opacity: 0.7 }}>No repos found for "{q}".</p>;
+    return (
+        <ul className="search-results">
+            {results.map((result) => (
+                <li key={result}>
+                    <a href={`/${result}`}>{result}</a>
+                </li>
+            ))}
+        </ul>
+    );
+}
 
 function parseRepoPath(pathname) {
     const parts = pathname
@@ -320,14 +403,30 @@ function TreeView({ tree, onSelect, path_of_the_parent = '' }) {
 }
 
 function Home() {
+    const [query, setQuery] = useState('');
+    const { results, loading, error } = useRepoSearch(query, 250);
+
     return (
         <div className="content-wrapper centerize">
-            <span className="block">
+            <span className="block home-search-block">
                 <h1>
                     <span style={{ color: 'yellow' }}>Zig</span>ref
                 </h1>
                 <h5>Search docs for multiple Zig packages.</h5>
-                <input autoFocus placeholder="Search..." className="input-text" type="text" />
+                <input
+                    autoFocus
+                    placeholder="Search..."
+                    className="input-text"
+                    type="text"
+                    value={query}
+                    onInput={(e) => setQuery(e.target.value)}
+                />
+                <SearchResultList
+                    results={results}
+                    loading={loading}
+                    error={error}
+                    query={query}
+                />
             </span>
         </div>
     );
