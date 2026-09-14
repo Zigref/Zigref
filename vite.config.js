@@ -1,6 +1,6 @@
-import { cloudflare } from "@cloudflare/vite-plugin";
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite';
+import preact from '@preact/preset-vite';
 
 export default defineConfig({
-	plugins: [cloudflare()],
+    plugins: [preact()],
 });

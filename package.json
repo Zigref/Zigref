@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.9",
+    "@preact/preset-vite": "^2.10.6",
     "prettier": "^3.6.2",
     "wrangler": "^4.131.2"
   }
