@@ -1,10 +1,45 @@
 <!doctype html>
-<html>
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <title>App</title>
-        <link rel="stylesheet" href="/main.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Zigref - View documentation for Zig packages.</title>
+        <meta
+            name="description"
+            content="Search and read documentation for Zig packages."
+        />
+        <meta
+            name="keywords"
+            content="zig, ziglang, zig programming language, zig packages, zig documentation, zig api reference, zig source code, zig code search, zig std lib, github, codeberg"
+        />
+        <meta name="author" content="Zigistry" />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="theme-color" content="#171717" />
+        <link rel="canonical" href="https://zigref.zigistry.dev/" />
         <link rel="icon" href="/zigref.png" />
+        <link rel="apple-touch-icon" href="/zigref.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preconnect" href="https://huggingface.co" />
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Zigref" />
+        <meta property="og:title" content="Zigref - Search Documentation for Zig Packages" />
+        <meta
+            property="og:description"
+            content="Search and read documentation for Zig packages."
+        />
+        <meta property="og:url" content="https://zigref.zigistry.dev/" />
+        <meta property="og:image" content="https://zigref.zigistry.dev/zigref.png" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Zigref - Search documentation for Zig packages" />
+        <meta
+            name="twitter:description"
+            content="Search and read documentation for Zig packages."
+        />
+        <meta name="twitter:image" content="https://zigref.zigistry.dev/zigref.png" />
+
+        <link rel="stylesheet" href="/main.css" />
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap');
 
@@ -14,10 +49,79 @@
                 font-style: normal;
             }
         </style>
+
+        <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@graph": [
+                    {
+                        "@type": "WebSite",
+                        "@id": "https://zigref.dev/#website",
+                        "url": "https://zigref.dev/",
+                        "name": "Zigref",
+                        "description": "Search documentation, API references and source code across thousands of Zig packages hosted on GitHub and Codeberg.",
+                        "inLanguage": "en",
+                        "potentialAction": {
+                            "@type": "SearchAction",
+                            "target": {
+                                "@type": "EntryPoint",
+                                "urlTemplate": "https://api.zigref.dev/search?q={search_term_string}"
+                            },
+                            "query-input": "required name=search_term_string"
+                        }
+                    },
+                    {
+                        "@type": "WebApplication",
+                        "@id": "https://zigref.dev/#software",
+                        "name": "Zigref",
+                        "url": "https://zigref.dev/",
+                        "applicationCategory": "DeveloperApplication",
+                        "operatingSystem": "Any",
+                        "description": "Contains search for documentation, showcasing each function, global declarations, and great level of documentation.",
+                        "featureList": [
+                            "Search zig package names",
+                            "Per-package API documentation",
+                            "Functions, structs, types and test declarations",
+                            "Source code links to GitHub and Codeberg of each and every declaration."
+                        ],
+                        "publisher": {
+                            "@type": "Organization",
+                            "name": "Zigistry",
+                            "url": "https://zigistry.dev"
+                        }
+                    }
+                ]
+            }
+        </script>
     </head>
 
     <body>
-        <div id="app"></div>
+        <div id="app">
+            <div class="content-wrapper centerize">
+                <span class="block home-search-block">
+                    <h1><span style="color: yellow">Zig</span>ref</h1>
+                    <h5>Search docs for multiple Zig packages.</h5>
+                    <p>
+                        View the source code and generated API documentation for thousands of Zig packages that are hosted on Codeberg and GitHub.
+                        Locate types, functions, structs, and tests that have line-level links to the original source.
+                    </p>
+                </span>
+            </div>
+        </div>
+
+        //
+        <noscript>
+            <h1>Zigref - Search Zig Package Documentation</h1>
+            <p>
+                Zigref finds source code, documentation, and API references for thousands of Zig packages stored on Codeberg and GitHub.
+                Examine function, struct, type, and test declarations with line level source links in the per package documentation.
+            </p>
+            <p>Packages are addressed at /gh/{owner}/{repo} (GitHub) or /cb/{owner}/{repo} (Codeberg).</p>
+            <p>
+                <a href="https://zigistry.dev">Zigistry</a>, a packages and programs registry for the Zig programming
+                language.
+            </p>
+        </noscript>
 
         <script type="module" src="/main.jsx"></script>
     </body>

@@ -455,7 +455,7 @@ function HomeFooter() {
                 </svg>
                 Zigistry
             </a>
-            <a href="https://github.com/Zigistry/Zigref" target="_blank" rel="noopener noreferrer">
+            <a href="https://github.com/Zigref/Zigref" target="_blank" rel="noopener noreferrer">
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="12"
