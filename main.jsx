@@ -9,7 +9,7 @@ const isFolder = (value) => {
 };
 
 const HF_BUCKET_BASE = 'https://huggingface.co/buckets/Zigref/Zigref/resolve/database';
-const SEARCH_API_BASE = import.meta.env?.VITE_SEARCH_API || 'http://localhost:8080';
+const SEARCH_API_BASE = 'https://api.zigref.dev';
 
 async function fetch_repo_search(q, signal) {
     const res = await fetch(
@@ -421,6 +421,14 @@ function Home() {
                     value={query}
                     onInput={(e) => setQuery(e.target.value)}
                 />
+                <div className="search-buttons">
+                    <button className="search-btn" onClick={() => window.open(`https://zigistry.dev/search#search=${encodeURIComponent(query)}&type=packages&sort=stars&dir=desc&page=1`, '_blank')}>
+                        Search on Zigistry
+                    </button>
+                    <button className="search-btn" onClick={() => setQuery(query)}>
+                        Search just that
+                    </button>
+                </div>
                 <SearchResultList
                     results={results}
                     loading={loading}

@@ -290,6 +290,33 @@ main {
     width: 400px;
 }
 
+.search-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+}
+
+.search-btn {
+    background-color: transparent;
+    border: 1px solid #4e4e4e;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.search-btn:hover {
+    background-color: #4e4e4e;
+    border-color: #6a6a6a;
+}
+
+.search-btn:active {
+    background-color: #6a6a6a;
+}
+
 .block {
     display: block;
     margin-bottom: 50px;
