@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { render } from 'preact';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-twilight.css';
@@ -12,10 +12,7 @@ const HF_BUCKET_BASE = 'https://huggingface.co/buckets/Zigref/Zigref/resolve/dat
 const SEARCH_API_BASE = 'https://api.zigref.dev';
 
 async function fetch_repo_search(q, signal) {
-    const res = await fetch(
-        `${SEARCH_API_BASE}/search?q=${encodeURIComponent(q)}`,
-        { signal }
-    );
+    const res = await fetch(`${SEARCH_API_BASE}/search?q=${encodeURIComponent(q)}`, { signal });
 
     const data = await res.json();
 
@@ -26,13 +23,24 @@ async function fetch_repo_search(q, signal) {
     return data.results || [];
 }
 
-function useRepoSearch(query, delay = 250) {
+function useRepoSearch() {
     const [results, set_results] = useState(null);
     const [loading, set_loading] = useState(false);
     const [error, set_error] = useState(null);
+    const [searchedQuery, set_searched_query] = useState('');
+    const controllerRef = useRef(null);
 
     useEffect(() => {
-        const q = query?.trim();
+        return () => {
+            if (controllerRef.current) {
+                controllerRef.current.abort();
+            }
+        };
+    }, []);
+
+    const search = async (rawQuery) => {
+        const q = rawQuery?.trim();
+        set_searched_query(q || '');
 
         if (!q) {
             set_results(null);
@@ -48,35 +56,35 @@ function useRepoSearch(query, delay = 250) {
             return;
         }
 
+        if (controllerRef.current) {
+            controllerRef.current.abort();
+        }
         const controller = new AbortController();
+        controllerRef.current = controller;
 
         set_loading(true);
         set_error(null);
 
-        const timer = setTimeout(async () => {
-            try {
-                set_results(await fetch_repo_search(q, controller.signal));
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    set_results([]);
-                    set_error(e.message);
-                }
-            } finally {
+        try {
+            const data = await fetch_repo_search(q, controller.signal);
+            set_results(data);
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                set_results([]);
+                set_error(e.message);
+            }
+        } finally {
+            if (controllerRef.current === controller) {
                 set_loading(false);
             }
-        }, delay);
+        }
+    };
 
-        return () => {
-            clearTimeout(timer);
-            controller.abort();
-        };
-    }, [query]);
-
-    return { results, loading, error };
+    return { results, loading, error, searchedQuery, search };
 }
 
 function SearchResultList({ results, loading, error, query }) {
-    const q = query.trim();
+    const q = query?.trim();
     if (!q) return null;
     if (loading) return <p style={{ fontSize: 'small', opacity: 0.7 }}>Searching...</p>;
     if (error) return <p style={{ fontSize: 'small', opacity: 0.7 }}>{error}</p>;
@@ -176,13 +184,13 @@ function RenderComponent({ component, prefix, repo_info, file_path, commit_hash 
     const source_url =
         repo_info && file_path
             ? build_source_url(
-                repo_info.provider,
-                repo_info.owner,
-                repo_info.repo,
-                commit_hash,
-                file_path,
-                component.line_number,
-            )
+                  repo_info.provider,
+                  repo_info.owner,
+                  repo_info.repo,
+                  commit_hash,
+                  file_path,
+                  component.line_number
+              )
             : null;
     const source_label = repo_info?.provider === 'cb' ? 'Open file on Codeberg' : 'Open file on GitHub';
     return (
@@ -328,7 +336,10 @@ function TreeView({ tree, onSelect, path_of_the_parent = '' }) {
                         {isFolder(value) ? (
                             <details open>
                                 <summary>
-                                    <span style={{ display: 'flex', alignItems: 'center' }} className="file_folder_name">
+                                    <span
+                                        style={{ display: 'flex', alignItems: 'center' }}
+                                        className="file_folder_name"
+                                    >
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
                                             width="15"
@@ -404,7 +415,11 @@ function TreeView({ tree, onSelect, path_of_the_parent = '' }) {
 
 function Home() {
     const [query, setQuery] = useState('');
-    const { results, loading, error } = useRepoSearch(query, 250);
+    const { results, loading, error, searchedQuery, search } = useRepoSearch();
+
+    const handleSearch = () => {
+        search(query);
+    };
 
     return (
         <div className="content-wrapper centerize">
@@ -420,21 +435,30 @@ function Home() {
                     type="text"
                     value={query}
                     onInput={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            handleSearch();
+                        }
+                    }}
                 />
                 <div className="search-buttons">
-                    <button className="search-btn" onClick={() => window.open(`https://zigistry.dev/search#search=${encodeURIComponent(query)}&type=packages&sort=stars&dir=desc&page=1`, '_blank')}>
+                    <button
+                        type="button"
+                        className="search-btn"
+                        onClick={() =>
+                            window.open(
+                                `https://zigistry.dev/search#search=${encodeURIComponent(query)}&type=packages&sort=stars&dir=desc&page=1`,
+                                '_blank'
+                            )
+                        }
+                    >
                         Search on Zigistry
                     </button>
-                    <button className="search-btn" onClick={() => setQuery(query)}>
+                    <button type="button" className="search-btn" onClick={handleSearch}>
                         Search just that
                     </button>
                 </div>
-                <SearchResultList
-                    results={results}
-                    loading={loading}
-                    error={error}
-                    query={query}
-                />
+                <SearchResultList results={results} loading={loading} error={error} query={searchedQuery} />
             </span>
         </div>
     );
