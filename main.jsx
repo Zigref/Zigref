@@ -539,6 +539,163 @@ function DocsFooter({ commit_hash, size_in_byte }) {
     );
 }
 
+function getFiles(tree, prefix = '') {
+    let files = [];
+
+    for (const [k, v] of Object.entries(tree)) {
+        const p = prefix ? `${prefix}/${k}` : k;
+
+        if (isFolder(v)) {
+            files.push(...getFiles(v, p));
+        } else {
+            files.push({ name: p, index: v });
+        }
+    }
+
+    return files;
+}
+
+function getComponents(fileData, prefix = '') {
+    if (!fileData) return [];
+
+    let list = [];
+
+    for (const component of fileData.components || []) {
+        list.push({
+            ...component,
+            fullName: prefix ? `${prefix}::${component.name}` : component.name
+        });
+    }
+
+    for (const namespace of fileData.namespaces || []) {
+        const name = prefix ? `${prefix}::${namespace.name}` : namespace.name;
+        list.push(...getComponents(namespace, name));
+    }
+
+    return list;
+}
+
+function DocSearch({ tree, dataEntries, onSelect }) {
+    const [query, setQuery] = useState('');
+    const q = query.trim().toLowerCase();
+
+    const results = [];
+
+    if (q) {
+        for (const file of getFiles(tree)) {
+            for (const component of getComponents(dataEntries[file.index])) {
+                const matches =
+                    component.fullName.toLowerCase().includes(q) ||
+                    component.comment?.toLowerCase().includes(q);
+
+                if (matches) {
+                    results.push({ file, component: component });
+                }
+
+                if (results.length >= 40) break;
+            }
+
+            if (results.length >= 40) break;
+        }
+    }
+
+    return (
+        <div>
+            <h5 id="mention_title">Search</h5>
+
+            <input
+                className="search_text"
+                style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '6px 8px',
+                    marginBottom: '8px'
+                }}
+                type="text"
+                placeholder="Search functions, types..."
+                value={query}
+                onInput={(e) => setQuery(e.target.value)}
+                autoFocus
+            />
+
+            {q && results.length === 0 && (
+                <p style={{ fontSize: 'small', opacity: 0.7 }}>
+                    No results found.
+                </p>
+            )}
+
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {results.map(({ file, component }, i) => (
+                    <li
+                        key={i}
+                        className="file_folder_name"
+                        style={{ padding: '6px 4px', cursor: 'pointer' }}
+                        onClick={() => onSelect(file, component)}
+                    >
+                        <div>
+                            <span
+                                className="component_type"
+                                style={{ fontSize: '11px', marginRight: '6px' }}
+                            >
+                                {component.type}
+                            </span>
+
+                            <span className="component_name">
+                                {component.fullName}
+                            </span>
+                        </div>
+
+                        <div style={{ fontSize: '11px', opacity: 0.6 }}>
+                            {file.name}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
+function SupportButton() {
+    const [stars, setStars] = useState(null);
+
+    useEffect(() => {
+        fetch('https://api.github.com/repos/Zigref/Zigref')
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (data && typeof data.stargazers_count === 'number') {
+                    setStars(data.stargazers_count);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    return (
+        <a
+            href="https://github.com/Zigref/Zigref"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="support-btn"
+            title="Support Zigref on GitHub"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="#f59e0b"
+                stroke="#d97706"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+            <span>Support Zigref</span>
+            {stars !== null && <span className="support-stars">{stars}</span>}
+        </a>
+    );
+}
+
 function App() {
     const [tree, setTree] = useState();
     const [dataEntries, setDataEntries] = useState();
@@ -622,6 +779,23 @@ function App() {
         };
     }, [currentPath, is_home_page]);
 
+    const handleSelectSymbol = (file, component) => {
+        setSelectedIndex({ name: file.name, path: file.name, value: file.index });
+        const id = component.fullName.replace(/::/g, '--');
+        window.location.hash = id;
+        setTimeout(() => {
+            const element = document.getElementById(id);
+            if (element) {
+                let p = element.parentElement;
+                while (p) {
+                    if (p.tagName === 'DETAILS') p.open = true;
+                    p = p.parentElement;
+                }
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 100);
+    };
+
     if (is_home_page) {
         return (
             <div>
@@ -629,6 +803,7 @@ function App() {
                     <a href="/" style={{ color: 'white', textDecoration: 'none' }}>
                         <span style={{ color: 'yellow' }}>Zig</span>ref
                     </a>
+                    <SupportButton />
                 </nav>
                 <Home />
                 <HomeFooter />
@@ -642,7 +817,7 @@ function App() {
                 <a href="/" style={{ color: 'white', textDecoration: 'none' }}>
                     <span style={{ color: 'yellow' }}>Zig</span>ref
                 </a>
-                <input className="search_text" type="text" />
+                <SupportButton />
             </nav>
             <div class="content-wrapper">
                 <aside id="side-side-bar">
@@ -704,9 +879,11 @@ function App() {
                             )}
                         </>
                     ) : (
-                        <>
-                            <h5 id="mention_title">Search</h5>
-                        </>
+                        <DocSearch
+                            tree={tree}
+                            dataEntries={dataEntries}
+                            onSelect={handleSelectSymbol}
+                        />
                     )}
                 </aside>
 
