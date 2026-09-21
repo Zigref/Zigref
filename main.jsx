@@ -655,8 +655,8 @@ function DocSearch({ tree, dataEntries, onSelect }) {
     );
 }
 
-function SupportButton() {
-    const [stars, setStars] = useState(null);
+function StarButton() {
+    const [stars, setStars] = useState(1);
 
     useEffect(() => {
         fetch('https://api.github.com/repos/Zigref/Zigref')
@@ -674,24 +674,28 @@ function SupportButton() {
             href="https://github.com/Zigref/Zigref"
             target="_blank"
             rel="noopener noreferrer"
-            className="support-btn"
-            title="Support Zigref on GitHub"
+            className="star-btn"
+            title="Star Zigref on GitHub"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="#f59e0b"
-                stroke="#d97706"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-            >
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            <span>Support Zigref</span>
-            {stars !== null && <span className="support-stars">{stars}</span>}
+            <span className="star-btn-content">
+                <svg
+                    stroke="currentColor"
+                    fill="currentColor"
+                    strokeWidth="0"
+                    viewBox="0 0 24 24"
+                    height="16"
+                    width="16"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        d="M11.083 5.104c.35-.8 1.485-.8 1.834 0l1.752 4.022a1 1 0 0 0 .84.597l4.463.342c.9.069 1.255 1.2.556 1.771l-3.33 2.723a1 1 0 0 0-.337 1.016l1.03 4.119c.214.858-.71 1.552-1.474 1.106l-3.913-2.281a1 1 0 0 0-1.008 0L7.583 20.8c-.764.446-1.688-.248-1.474-1.106l1.03-4.119A1 1 0 0 0 6.8 14.56l-3.33-2.723c-.698-.571-.342-1.702.557-1.771l4.462-.342a1 1 0 0 0 .84-.597l1.753-4.022Z"
+                    />
+                </svg>
+                <span>Star Zigref</span>
+            </span>
+            {stars !== null && <span className="star-btn-count">{stars}</span>}
         </a>
     );
 }
@@ -704,6 +708,7 @@ function App() {
     const [selectedIndex, setSelectedIndex] = useState(null);
     const [size_in_byte, set_size_in_byte] = useState(null);
     const [active_view, set_active_view] = useState('files');
+    const [mobile_view, set_mobile_view] = useState('sidebar');
     const [currentPath, setCurrentPath] = useState(window.location.pathname);
     const [is_loading, set_is_loading] = useState(false);
     const [fetch_error, set_fetch_error] = useState(null);
@@ -756,6 +761,7 @@ function App() {
         setTree(undefined);
         setDataEntries(undefined);
         setSelectedIndex(null);
+        set_mobile_view('sidebar');
         set_repo_info(parsed);
         fetchDocsBr(parsed.provider, parsed.owner, parsed.repo)
             .then(({ data, sizeKiB }) => {
@@ -779,8 +785,14 @@ function App() {
         };
     }, [currentPath, is_home_page]);
 
+    const handleSelectFile = (fileItem) => {
+        setSelectedIndex(fileItem);
+        set_mobile_view('doc');
+    };
+
     const handleSelectSymbol = (file, component) => {
         setSelectedIndex({ name: file.name, path: file.name, value: file.index });
+        set_mobile_view('doc');
         const id = component.fullName.replace(/::/g, '--');
         window.location.hash = id;
         setTimeout(() => {
@@ -803,7 +815,7 @@ function App() {
                     <a href="/" style={{ color: 'white', textDecoration: 'none' }}>
                         <span style={{ color: 'yellow' }}>Zig</span>ref
                     </a>
-                    <SupportButton />
+                    <StarButton />
                 </nav>
                 <Home />
                 <HomeFooter />
@@ -817,13 +829,17 @@ function App() {
                 <a href="/" style={{ color: 'white', textDecoration: 'none' }}>
                     <span style={{ color: 'yellow' }}>Zig</span>ref
                 </a>
-                <SupportButton />
+                <StarButton />
             </nav>
             <div class="content-wrapper">
                 <aside id="side-side-bar">
                     <button
-                        class={`sidebar-btn ${active_view === 'files' ? 'active' : ''}`}
-                        onClick={() => set_active_view('files')}
+                        class={`sidebar-btn ${active_view === 'files' && mobile_view === 'sidebar' ? 'active' : ''}`}
+                        onClick={() => {
+                            set_active_view('files');
+                            set_mobile_view('sidebar');
+                        }}
+                        title="File Explorer"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -841,8 +857,12 @@ function App() {
                         </svg>
                     </button>
                     <button
-                        class={`sidebar-btn ${active_view === 'search' ? 'active' : ''}`}
-                        onClick={() => set_active_view('search')}
+                        class={`sidebar-btn ${active_view === 'search' && mobile_view === 'sidebar' ? 'active' : ''}`}
+                        onClick={() => {
+                            set_active_view('search');
+                            set_mobile_view('sidebar');
+                        }}
+                        title="Search"
                     >
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -860,8 +880,34 @@ function App() {
                             <circle cx="11" cy="11" r="8" />
                         </svg>
                     </button>
+                    {selectedIndex !== null && (
+                        <button
+                            class={`sidebar-btn doc-tab-btn ${mobile_view === 'doc' ? 'active' : ''}`}
+                            onClick={() => set_mobile_view('doc')}
+                            title="Documentation"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="lucide lucide-file-text-icon lucide-file-text"
+                            >
+                                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                                <path d="M10 9H8" />
+                                <path d="M16 13H8" />
+                                <path d="M16 17H8" />
+                            </svg>
+                        </button>
+                    )}
                 </aside>
-                <aside id="sidebar">
+                <aside id="sidebar" className={mobile_view === 'doc' ? 'mobile-hidden' : ''}>
                     {active_view === 'files' ? (
                         <>
                             <h5 id="mention_title">File Explorer</h5>
@@ -873,7 +919,7 @@ function App() {
                             {fetch_error ? (
                                 <p>{fetch_error}</p>
                             ) : tree ? (
-                                <TreeView tree={tree} onSelect={setSelectedIndex} />
+                                <TreeView tree={tree} onSelect={handleSelectFile} />
                             ) : (
                                 'Loading…'
                             )}
@@ -887,13 +933,35 @@ function App() {
                     )}
                 </aside>
 
-                <main>
+                <main className={mobile_view === 'sidebar' ? 'mobile-hidden' : ''}>
                     {is_loading ? (
                         <p>Loading docs…</p>
                     ) : fetch_error ? (
                         <p>{fetch_error}</p>
                     ) : selectedIndex !== null ? (
                         <>
+                            <div className="doc-header-mobile">
+                                <button
+                                    type="button"
+                                    className="mobile-back-btn"
+                                    onClick={() => set_mobile_view('sidebar')}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <path d="m15 18-6-6 6-6" />
+                                    </svg>
+                                    Files
+                                </button>
+                            </div>
                             <h2>
                                 Showing documentation for file:{' '}
                                 <span className="line_number">{selectedIndex.name}</span>
